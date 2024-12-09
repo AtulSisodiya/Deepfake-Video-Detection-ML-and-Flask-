@@ -1,0 +1,3 @@
+cd ProjectsMiniconda\DeepfakeDetection
+conda activate myenv
+python run.py

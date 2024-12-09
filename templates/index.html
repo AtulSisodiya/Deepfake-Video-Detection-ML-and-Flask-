@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepfake Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <!-- Include Socket.IO client -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Deepfake Detection</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="mb-3">
+                <input type="file" class="form-control" id="video" name="video" accept="video/*" required />
+            </div>
+            <button type="submit" class="btn btn-primary">Upload Video</button>
+        </form>
+
+        <!-- Loading Progress Bar -->
+        <div id="progress-container" class="mt-4" style="display: none;">
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p class="text-center mt-2" id="progress-text" style="font-size: 1.2rem;">Uploading...</p>
+        </div>
+
+        <!-- Result Message -->
+        <div id="result-message" class="mt-3 text-center" style="font-size: 1.5rem;"></div>
+
+        <div id="result-frame" class="mt-5" style="display: none;">
+            <h3 class="text-center">Processed Fake Frames</h3>
+            <div class="row" id="frames-container">
+                <!-- Processed frames will be inserted here dynamically -->
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error" id="error-message" style="color: red; text-align: center;"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const socket = io.connect();
+
+        const form = document.getElementById('upload-form');
+        const errorMessage = document.getElementById('error-message');
+        const framesContainer = document.getElementById('frames-container');
+        const resultFrame = document.getElementById('result-frame');
+        const resultMessage = document.getElementById('result-message');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append('video', document.getElementById('video').files[0]);
+
+            // Reset previous error, result, and frames
+            errorMessage.textContent = '';
+            framesContainer.innerHTML = '';
+            resultMessage.textContent = '';
+            resultFrame.style.display = 'none';
+
+            // Show the progress bar and set initial state
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Uploading...';
+
+            fetch('/process', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Set result message and color based on the result
+                resultMessage.textContent = data.result_message;
+                resultMessage.style.color = data.result_color;
+
+                if (data.frames && data.frames.length > 0) {
+                    resultFrame.style.display = 'block';
+                    data.frames.forEach(frame => {
+                        const img = document.createElement('img');
+                        img.src = 'data:image/jpeg;base64,' + frame;
+                        img.classList.add('col-md-4', 'mb-3');
+                        framesContainer.appendChild(img);
+                    });
+                } else {
+                    resultMessage.textContent = 'No fake frames detected.';
+                }
+            })
+            .catch(error => {
+                errorMessage.textContent = 'An error occurred.';
+            });
+        });
+
+        // Listen for progress updates from the server
+        socket.on('progress_update', function(data) {
+            progressBar.style.width = `${data.progress}%`;
+            progressBar.setAttribute('aria-valuenow', data.progress);
+            progressText.textContent = data.status;
+        });
+    </script>
+</body>
+</html>
+
